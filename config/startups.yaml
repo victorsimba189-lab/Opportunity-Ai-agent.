@@ -1,0 +1,55 @@
+# Agent 3 — Startup intelligence (India and global)
+
+search_defaults:
+  topic: news
+  time_range: week
+  max_results: 6
+
+queries:
+  - "construction tech OR proptech startup raises funding round"
+  - "agritech startup raises funding valuation"
+  - "AI startup valuation funding round billion"
+  - "edtech startup funding OR layoffs OR down round"
+  - "geospatial GIS OR drone startup raises funding"
+  - "Indian startup unicorn valuation revenue profit"
+
+feed_max_age_days: 3
+feeds:
+  - {name: Inc42, url: "https://inc42.com/feed/"}
+  - {name: Entrackr, url: "https://entrackr.com/feed/"}
+  - {name: YourStory, url: "https://yourstory.com/feed"}
+  - {name: ET Tech Startups, url: "https://economictimes.indiatimes.com/tech/startups/rssfeeds/78570540.cms"}
+  - {name: TechCrunch Startups, url: "https://techcrunch.com/category/startups/feed/"}
+  - {name: TechCrunch Venture, url: "https://techcrunch.com/category/venture/feed/"}
+  - {name: Crunchbase News, url: "https://news.crunchbase.com/feed/"}
+  - {name: AgFunderNews, url: "https://agfundernews.com/feed"}
+  - {name: Geospatial World, url: "https://www.geospatialworld.net/feed/"}
+  - {name: Construction Dive, url: "https://www.constructiondive.com/feeds/news/"}
+
+# Number of new stories per day that get the deeper Opus analysis (growth story, moat, lessons).
+analyse_top: 3
+
+# Sector boosts.
+keywords:
+  construction: 5
+  contech: 5
+  proptech: 5
+  real estate: 3
+  agritech: 5
+  agri: 3
+  farm: 2
+  gis: 5
+  geospatial: 5
+  drone: 3
+  infrastructure: 4
+  edtech: 4
+  " ai ": 3
+  artificial intelligence: 3
+  climate: 2
+  india: 2
+
+manual_checks:
+  - label: "Tracxn / Crunchbase profiles need an account — use for valuation cross-checks"
+    url: "https://www.crunchbase.com/"
+  - label: "MCA filings (official revenue for Indian companies, paid)"
+    url: "https://www.mca.gov.in/"

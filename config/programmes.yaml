@@ -1,0 +1,71 @@
+# Agent 2 — Free / fully funded startup learning & founder opportunities in India
+
+search_defaults:
+  topic: general
+  time_range: month
+  country: india
+  max_results: 6
+
+queries:
+  - "free online entrepreneurship course with certificate India 2026"
+  - "startup bootcamp OR founder workshop India November December 2026 free registration"
+  - "pre-incubation programme applications open 2026 India free equity-free students"
+  - "startup competition India 2026 2027 students prize apply deadline"
+  - "hackathon India December 2026 January 2027 students prize registration"
+  - "startup grant seed funding scheme India 2026 apply student founders"
+  - "accelerator programme India applications open 2026 equity-free"
+  - query: "startup programme applications open 2026"
+    include_domains: [startupindia.gov.in, msh.meity.gov.in, aim.gov.in, startuptn.in,
+                      startupmission.kerala.gov.in, t-hub.co, nsrcel.org, wadhwanifoundation.org,
+                      nptel.ac.in, unstop.com]
+
+watchlist:
+  - name: Startup India Learning Programme (free, certificate)
+    url: https://www.startupindia.gov.in/content/sih/en/learning-and-development_v2.html
+  - name: Startup India Seed Fund Scheme
+    url: https://seedfund.startupindia.gov.in/
+  - name: NSRCEL, IIM Bangalore
+    url: https://nsrcel.org/
+  - name: MeitY Startup Hub
+    url: https://msh.meity.gov.in/
+  - name: StartupTN (Tamil Nadu)
+    url: https://startuptn.in/
+  - name: Kerala Startup Mission
+    url: https://startupmission.kerala.gov.in/
+  - name: Google for Startups Accelerator India
+    url: https://startup.google.com/programs/accelerator/india/
+
+follow_link_pattern: "programme|program|cohort|bootcamp|course|challenge|hackathon|grant|call for|applications|incubat|accelerat"
+follow_links: 4
+
+keywords:
+  free: 4
+  certificate: 2
+  no equity: 4
+  equity-free: 4
+  grant: 3
+  pre-incubation: 3
+  bootcamp: 2
+  hackathon: 2
+  students: 2
+  construction: 3
+  edtech: 2
+  agritech: 2
+  "ai ": 1
+locations:
+  online: 3
+  chennai: 2
+  bengaluru: 2
+  bangalore: 2
+  hyderabad: 2
+  kochi: 2
+  kerala: 2
+  tamil nadu: 2
+
+manual_checks:
+  - label: "Unstop: competitions & hackathons"
+    url: "https://unstop.com/competitions"
+  - label: "Startup India: programmes & challenges"
+    url: "https://www.startupindia.gov.in/content/sih/en/startup-scheme.html"
+  - label: "SWAYAM / NPTEL: entrepreneurship courses (free to audit; exam fee for certificate)"
+    url: "https://onlinecourses.nptel.ac.in/"

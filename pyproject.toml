@@ -1,0 +1,9 @@
+[project]
+name = "opportunity-scout"
+version = "0.1.0"
+description = "Daily Telegram digest of civil-engineering internships, free startup programmes and startup intelligence."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

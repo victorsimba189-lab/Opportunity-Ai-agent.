@@ -1,0 +1,22 @@
+# Who the agents work for. Sent to Claude with every extraction, so keep it short and factual.
+# Public repo: don't put anything here you wouldn't want public.
+student:
+  status: Foreign national (international student) studying in India
+  nationality: not specified        # optional: set your country to sharpen eligibility checks
+  degree: B.E./B.Tech Civil Engineering
+  year: Final year, graduating 2027
+  preferred_regions: [Tamil Nadu, Karnataka, Kerala, Andhra Pradesh, Telangana, Puducherry]
+  interests:
+    - Pre-engineered buildings (PEB) and prefabrication
+    - Structural engineering and steel structures
+    - Construction management
+    - EPC, infrastructure and industrial construction
+    - BIM
+    - Research internships (IIT, NIT, IISc, CSIR labs)
+internship_window:
+  start: "2026-12-01"
+  end: "2027-12-31"
+founder:
+  stage: Aspiring first-time founder (student), idea stage
+  budget: Free or fully funded programmes only
+  sectors: [AI, EdTech, Construction Tech, PropTech, AgriTech, GIS, Infrastructure]

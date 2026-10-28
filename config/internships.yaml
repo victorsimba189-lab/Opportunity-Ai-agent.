@@ -1,0 +1,87 @@
+# Agent 1 — Civil engineering internships (Dec 2026 – 2027, South India priority)
+# Tavily budget: each query costs 1 credit per day (cached for the rest of the IST day).
+
+search_defaults:
+  topic: general
+  time_range: month
+  country: india
+  max_results: 6
+
+queries:
+  - "pre-engineered building PEB company internship civil engineering students 2026 2027"
+  - "PEB steel building internship Chennai OR Bengaluru OR Hyderabad OR Coimbatore civil engineering"
+  - "structural engineering steel structures internship December 2026 India civil students apply"
+  - "construction management internship South India 2026 2027 civil engineering final year"
+  - "EPC infrastructure company civil engineering internship 2027 India apply"
+  - "BIM Revit Tekla internship Chennai Bengaluru Hyderabad Kochi civil engineering 2026"
+  - "IIT NIT summer research internship 2027 civil engineering undergraduate apply"
+  - "CSIR laboratory OR IISc research internship 2027 civil engineering students"
+  - query: "civil engineering internship trainee structural steel"
+    include_domains: [larsentoubro.com, lntecc.com, tataprojects.com, afcons.com, shapoorjipallonji.com,
+                      ncclimited.com, kecrpg.com, kirbyinternational.com, pennarindia.com,
+                      interarchbuildings.com, tatabluescopesteel.com, everestind.com, zamilsteel.com]
+  - query: "civil engineering intern structural steel PEB India"
+    include_domains: [linkedin.com, internshala.com, unstop.com]
+
+# Official pages checked every run; re-extracted only when their content changes.
+watchlist:
+  - name: CSIR-SERC Chennai (internships & project work)
+    url: https://serc.res.in/
+  - name: IIT Madras Summer Fellowship Programme
+    url: https://sfp.iitm.ac.in/
+  - name: Science Academies Summer Research Fellowship 2027
+    url: https://webjapps.ias.ac.in/fellowship2027/
+  - name: AICTE Internship Portal
+    url: https://internship.aicte-india.org/
+
+# On a changed official page, follow up to `follow_links` notice links (often PDFs) whose text/URL matches.
+follow_link_pattern: "intern|training|trainee|fellowship|summer|winter|project.?work|students"
+follow_links: 4
+
+# Used only when YOUTUBE_API_KEY is set.
+youtube_queries:
+  - "civil engineering internship 2026 India apply"
+  - "PEB pre engineered building internship"
+
+# Score boosts (matched case-insensitively against title, organisation, location, focus areas).
+keywords:
+  pre-engineered: 6
+  peb: 6
+  prefab: 5
+  steel: 4
+  structural: 4
+  epc: 3
+  bim: 3
+  construction management: 3
+  infrastructure: 2
+  research: 2
+  iit: 2
+  nit: 2
+  iisc: 3
+  csir: 3
+locations:
+  chennai: 4
+  bengaluru: 4
+  bangalore: 4
+  hyderabad: 4
+  kochi: 3
+  coimbatore: 3
+  tamil nadu: 3
+  karnataka: 3
+  kerala: 3
+  telangana: 3
+  andhra: 3
+  remote: 2
+
+# Shown by /sources — places that can't be searched automatically (login walls / platform terms).
+manual_checks:
+  - label: "LinkedIn: civil engineering internships in India"
+    url: "https://www.linkedin.com/jobs/search/?keywords=civil%20engineering%20intern%20structural&location=India&f_JT=I"
+  - label: "LinkedIn: PEB / pre-engineered building internships"
+    url: "https://www.linkedin.com/jobs/search/?keywords=pre-engineered%20building%20intern&location=India"
+  - label: "Internshala: civil engineering internships"
+    url: "https://internshala.com/internships/civil-engineering-internship/"
+  - label: "YouTube: latest civil internship videos"
+    url: "https://www.youtube.com/results?search_query=civil+engineering+internship+2026+India&sp=CAI%253D"
+  - label: "Instagram (login required): search 'civil engineering internship'"
+    url: "https://www.instagram.com/explore/search/keyword/?q=civil%20engineering%20internship"

@@ -1,0 +1,105 @@
+name: Daily digest
+
+on:
+  schedule:
+    # GitHub cron is UTC and can start late, so scouting begins early and the send waits for 10:00 IST.
+    - cron: "43 3 * * *"   # 09:13 IST: scout, then deliver at 10:00 IST (04:30 UTC)
+    - cron: "13 5 * * *"   # 10:43 IST: fallback; exits at once if today's digest was already sent
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: print the digest in the job summary instead of sending"
+        type: boolean
+        default: true
+      agents:
+        description: "Agents to run"
+        type: choice
+        options: [all, internships, programmes, startups]
+        default: all
+      force:
+        description: "Rescan and resend even if already done today"
+        type: boolean
+        default: false
+      wait:
+        description: "Wait until 10:00 IST before sending"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # push the database to the scout-data branch
+  actions: write    # keep scheduled workflows enabled
+
+concurrency:
+  group: scout-daily
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      SCOUT_EXTRACT_MODEL: ${{ vars.SCOUT_EXTRACT_MODEL }}
+      SCOUT_ANALYSIS_MODEL: ${{ vars.SCOUT_ANALYSIS_MODEL }}
+      SCOUT_MAX_LLM_USD_PER_MONTH: ${{ vars.SCOUT_MAX_LLM_USD_PER_MONTH }}
+      SCOUT_MAX_TAVILY_PER_DAY: ${{ vars.SCOUT_MAX_TAVILY_PER_DAY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore database
+        run: scripts/db_sync.sh pull
+
+      - name: Scout and deliver
+        env:
+          EVENT: ${{ github.event_name }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_AGENTS: ${{ inputs.agents }}
+          IN_FORCE: ${{ inputs.force }}
+          IN_WAIT: ${{ inputs.wait }}
+        run: |
+          args=()
+          if [ "$EVENT" = "schedule" ]; then
+            args+=(--wait)
+          else
+            args+=(--agents "${IN_AGENTS:-all}")
+            [ "$IN_DRY_RUN" = "true" ] && args+=(--dry-run)
+            [ "$IN_FORCE" = "true" ] && args+=(--force)
+            [ "$IN_WAIT" = "true" ] && args+=(--wait)
+          fi
+          echo "Running: python -m scout daily ${args[*]}"
+          python -m scout daily "${args[@]}"
+
+      - name: Save database
+        if: always()
+        run: scripts/db_sync.sh push
+
+      - name: Back up database
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: scout-db-${{ github.run_id }}
+          path: data/scout.db
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Keep scheduled workflows enabled
+        # Public repos disable schedules after 60 days without activity; re-enabling resets that.
+        if: always() && github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/daily.yml/enable"
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/bot.yml/enable"
