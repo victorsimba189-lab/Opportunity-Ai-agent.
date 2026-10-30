@@ -128,3 +128,17 @@ def test_poll_answers_only_allowed_chat_and_acks(db, tg):
     assert {chat for chat, _ in tg.sent} == {"42"}
     assert tg.acked == 13
     assert poll(db, tg, "42")["updates"] == 0  # acknowledged updates are not answered twice
+
+
+def test_daily_without_telegram_fails_before_scouting(tmp_path, monkeypatch, freeze):
+    from scout import cli
+
+    for name in ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SCOUT_DB", str(tmp_path / "scout.db"))
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    monkeypatch.setattr(cli, "run_scouts", lambda *a, **k: pytest.fail("scouted without a way to send"))
+
+    assert cli.main(["daily", "--wait"]) == 1
+    assert "TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID" in summary.read_text()

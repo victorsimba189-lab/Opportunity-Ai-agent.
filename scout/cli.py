@@ -92,12 +92,22 @@ def cmd_daily(args, settings: Settings, db: DB) -> int:
         summary(f"Digest for {today} was already sent at {existing['sent_at']} — nothing to do.")
         return 0
 
+    needed = () if args.skip_scout else ("anthropic_api_key", "tavily_api_key")
+    if not args.dry_run:
+        needed += ("telegram_bot_token", "telegram_chat_id")
+    missing = [m.upper() for m in settings.missing(*needed)]
+    if missing:
+        log.warning("missing secrets: %s", ", ".join(missing))
+        summary(f"**Missing repository secrets:** {', '.join(missing)}. Add them under "
+                "Settings → Secrets and variables → Actions (README, one-time setup).")
+    if not args.dry_run and settings.missing("telegram_bot_token", "telegram_chat_id"):
+        # Fail before scouting and waiting for 10:00 IST: without these the digest can't be sent.
+        log.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required to send; use --dry-run to preview")
+        return 1
+
     agents = AGENTS if args.agents == "all" else tuple(a.strip() for a in args.agents.split(","))
     results: list[AgentResult] = []
     if not args.skip_scout:
-        missing = settings.missing("anthropic_api_key", "tavily_api_key")
-        if missing:
-            log.warning("missing secrets: %s", ", ".join(m.upper() for m in missing))
         ctx = build_context(settings, db)
         results = run_scouts(ctx, list(agents), args.force)
         if ctx.llm:
