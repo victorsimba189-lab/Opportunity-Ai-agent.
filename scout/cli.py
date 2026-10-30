@@ -17,7 +17,7 @@ from .bot import COMMANDS, poll, whoami
 from .config import Settings, profile
 from .db import DB
 from .delivery import deliver_daily
-from .llm import LLM
+from .llm import make_llm
 from .report import command_report
 from .sources.fetch import Fetcher, make_client
 from .sources.tavily import Tavily
@@ -47,7 +47,7 @@ def build_context(settings: Settings, db: DB) -> Context:
     return Context(
         settings=settings,
         db=db,
-        llm=LLM(settings, db) if settings.anthropic_api_key else None,
+        llm=make_llm(settings, db),
         tavily=Tavily(settings.tavily_api_key, db, http, settings.max_tavily_credits_per_day),
         fetcher=Fetcher(http),
         http=http,
@@ -92,7 +92,7 @@ def cmd_daily(args, settings: Settings, db: DB) -> int:
         summary(f"Digest for {today} was already sent at {existing['sent_at']} — nothing to do.")
         return 0
 
-    needed = () if args.skip_scout else ("anthropic_api_key", "tavily_api_key")
+    needed = () if args.skip_scout else (settings.llm_key_field, "tavily_api_key")
     if not args.dry_run:
         needed += ("telegram_bot_token", "telegram_chat_id")
     missing = [m.upper() for m in settings.missing(*needed)]
@@ -111,7 +111,7 @@ def cmd_daily(args, settings: Settings, db: DB) -> int:
         ctx = build_context(settings, db)
         results = run_scouts(ctx, list(agents), args.force)
         if ctx.llm:
-            log.info("Claude calls: %d, est. cost $%.3f", ctx.llm.calls, ctx.llm.cost)
+            log.info("%s calls: %d, est. cost $%.3f", ctx.llm.provider, ctx.llm.calls, ctx.llm.cost)
 
     lines = ["## Scout run", "", "| agent | status | stats |", "|---|---|---|"]
     lines += [f"| {r.agent} | {r.status} | {json.dumps(dict(r.stats))} |" for r in results]

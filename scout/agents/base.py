@@ -233,7 +233,7 @@ class Scout:
     def run(self) -> AgentResult:
         db, settings = self.ctx.db, self.ctx.settings
         if self.ctx.llm is None:
-            self.error("ANTHROPIC_API_KEY not set: extraction skipped")
+            self.error(f"{settings.llm_key_field.upper()} not set: extraction skipped")
             self.result.status = "failed"
             return self.result
 
@@ -282,9 +282,13 @@ class Scout:
                 db.mark_seen(canonical_url(c.url), self.name, outcome)
 
         self.stats["expired"] += db.expire_items(timeutil.today_ist().isoformat())
-        if self.result.new_ids and not budget_hit:
+        if self.result.new_ids:
+            # Gemini quotas are per model, so the analysis model may still work after extraction ran out.
             try:
                 self.advise(self.result.new_ids)
+            except LLMBudgetExceeded as exc:
+                if str(exc)[:300] not in self.result.errors:
+                    self.error(str(exc))
             except Exception as exc:
                 self.error(f"advice step failed: {type(exc).__name__}: {exc}")
         self.stats["new_active"] = len(self.result.new_ids)

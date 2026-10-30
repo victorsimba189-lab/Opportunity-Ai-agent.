@@ -24,48 +24,83 @@ GitHub Actions (cron, UTC)
 
 Each agent:  Tavily search + official pages (watchlist) + RSS
              → skip URLs already processed → fetch page (robots.txt, rate-limited; HTML and PDF)
-             → Claude Haiku 5.5 extracts structured fields, each with a verbatim quote
+             → a small AI model extracts structured fields, each with a verbatim quote
+               (Gemini 3.5 Flash-Lite on the free tier, or Claude Haiku 5.5)
              → verify: quotes must appear in the page, dates must match their quotes,
                links must appear in the page; otherwise the field is dropped and flagged
              → filter (expired, Indian-nationals-only, not for final-year students,
                outside your dates, paid) → dedupe (URL, fingerprint, fuzzy) → score
-             → Claude Opus 5.5 ranks the new items and writes "why it matters" and
+             → a stronger model (Gemini 3.6 Flash, or Claude Opus 5.5) ranks the new items and writes "why it matters" and
                "next action", plus the growth story, edge and lessons for startup stories
 SQLite (data/scout.db) is kept on the bot-managed `scout-data` branch between runs.
 ```
 
-Code map: `scout/agents/` (the three agents and the shared pipeline), `scout/sources/` (Tavily, RSS, fetching, YouTube), `scout/verify.py`, `scout/dedupe.py`, `scout/rank.py`, `scout/llm.py`, `scout/report.py`, `scout/delivery.py`, `scout/bot.py`, `scout/db.py`. Search queries, official pages, feeds, score weights and manual-check links are in `config/*.yaml`. Your profile is in `config/profile.yaml`.
+Code map: `scout/agents/` (the three agents and the shared pipeline), `scout/sources/` (Tavily, RSS, fetching, YouTube), `scout/verify.py`, `scout/dedupe.py`, `scout/rank.py`, `scout/llm.py` (Claude), `scout/gemini.py` (Gemini), `scout/report.py`, `scout/delivery.py`, `scout/bot.py`, `scout/db.py`. Search queries, official pages, feeds, score weights and manual-check links are in `config/*.yaml`. Your profile is in `config/profile.yaml`.
 
 ---
 
-## One-time setup (about 15 minutes)
+## One-time setup (about 15 minutes, all free)
 
-1. **Create the Telegram bot.** In Telegram, open **@BotFather** → `/newbot` → choose a name. Copy the **bot token**, then open your new bot and press **Start**.
-2. **Get a Tavily key (free).** Sign up at <https://app.tavily.com>. The free tier gives 1,000 credits a month with no card. This system uses about 24 a day.
-3. **Get an Anthropic API key.** At <https://platform.claude.com> → API keys, create a key and add a little credit; API billing is separate from a Claude.ai subscription. Set a monthly spend limit in the Console as a safety net.
-4. **Add repository secrets.** In GitHub, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
-   - `ANTHROPIC_API_KEY`
-   - `TAVILY_API_KEY`
-   - `TELEGRAM_BOT_TOKEN`
-5. **Find your chat ID.** Go to **Actions → Telegram commands → Run workflow**, choose mode `whoami`. The bot replies in Telegram with your chat ID, so it never appears in the public logs. Add it as a secret named `TELEGRAM_CHAT_ID`.
-6. **Test the bot.** Run **Telegram commands** again with mode `send-test`. You should get a test message, and the command menu gets registered.
-7. **Do a dry run.** Go to **Actions → Daily digest → Run workflow** with `dry_run` ticked. Open the run's **Summary** to see the digest preview and per-agent stats. Nothing is sent.
-8. **Go live.** Run **Daily digest** with `dry_run` unticked to send today's digest. After that, the schedule runs it every day.
+You need four things: a Telegram bot, a Gemini key, a Tavily key, and your chat ID. None of them needs a credit card.
 
-Optional: add `YOUTUBE_API_KEY` (YouTube Data API v3, free quota) for video results. You can also set **repository variables** (not secrets) to override the defaults below.
+**Step 1. Make your Telegram bot.**
+Open Telegram and search for **@BotFather**. Send `/newbot`. Type a name, then a username that ends in `bot`. BotFather replies with a long **token** (it looks like `123456:ABC-xyz...`). Copy it somewhere safe. Then search for your new bot, open it and press **Start**.
+
+**Step 2. Get a free Gemini key (this is the AI).**
+Go to <https://aistudio.google.com/apikey> and sign in with your Google account. Click **Create API key**, accept the terms, and copy the key (it starts with `AIza`). Do not turn on billing; the free tier is enough.
+
+**Step 3. Get a free Tavily key (this is the web search).**
+Go to <https://app.tavily.com> and sign up. Copy the API key from the dashboard (it starts with `tvly-`). The free plan gives 1,000 searches a month, and this system uses about 24 a day.
+
+**Step 4. Put the keys into GitHub.**
+Open this repository on GitHub. Click **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add these three, one at a time (the name must match exactly):
+
+| Name | Value |
+|---|---|
+| `GEMINI_API_KEY` | the key from step 2 |
+| `TAVILY_API_KEY` | the key from step 3 |
+| `TELEGRAM_BOT_TOKEN` | the token from step 1 |
+
+**Step 5. Find your chat ID.**
+Click the **Actions** tab → **Telegram commands** (left side) → **Run workflow**. Choose mode `whoami` and click the green **Run workflow** button. After a minute your bot sends you a message with your **chat ID** (a number). Add it as one more secret named `TELEGRAM_CHAT_ID`, the same way as step 4.
+
+**Step 6. Send a test message.**
+Run **Telegram commands** again, this time with mode `send-test`. You should get a "test message" in Telegram. If not, check the token and chat ID secrets.
+
+**Step 7. Do a practice run (nothing is sent).**
+Click **Actions** → **Daily digest** → **Run workflow**. Leave `dry_run` ticked and click **Run workflow**. It takes about 10–20 minutes. Then open the run and click **Summary** to see what the digest would look like.
+
+**Step 8. Go live.**
+Run **Daily digest** once more with `dry_run` **unticked**. You get today's digest in Telegram. From now on it arrives by itself every day around 10:00 IST.
+
+Optional: add `YOUTUBE_API_KEY` (YouTube Data API v3, free quota) for video results. You can also set **repository variables** (Settings → Secrets and variables → Actions → **Variables** tab) to override the defaults below.
+
+### Free Gemini vs paid Claude
+
+The free Gemini tier is the default and costs nothing. Two things to know:
+
+- **Daily limits.** Each Gemini model has a free number of requests per minute and per day. Your own numbers are shown in Google AI Studio under **Usage / Rate limits**. The scout spaces its calls out (10 a minute) and, if a model's daily allowance runs out, it stops for the day, sends the digest with what it has, and checks the remaining pages the next day.
+- **Your prompts may be used by Google** to improve its products on the free tier. The scout only sends public web pages and the profile in `config/profile.yaml`, which is already public in this repository.
+
+Gemini **Pro** models have no free tier in the API, so the defaults are Flash models. To use Pro anyway, turn on billing in Google AI Studio and set the variable `SCOUT_ANALYSIS_MODEL` to `gemini-pro-latest`.
+
+To switch to Claude (paid, about US$5–10 a month): create a key at <https://platform.claude.com>, add some credit, and save it as the secret `ANTHROPIC_API_KEY`. When that secret exists it is used instead of Gemini. To force one or the other, set the variable `SCOUT_LLM_PROVIDER` to `gemini` or `anthropic`.
 
 ### Configuration reference
 
 | Name | Kind | Default | Purpose |
 |---|---|---|---|
-| `ANTHROPIC_API_KEY` | secret | — | Claude API (extraction + analysis) |
+| `GEMINI_API_KEY` | secret | — | Gemini API, free tier (extraction + analysis) |
+| `ANTHROPIC_API_KEY` | secret | unset | Optional: Claude instead of Gemini (paid) |
 | `TAVILY_API_KEY` | secret | — | Web search |
 | `TELEGRAM_BOT_TOKEN` | secret | — | Bot token from @BotFather |
 | `TELEGRAM_CHAT_ID` | secret | — | The only chat the bot will talk to |
 | `YOUTUBE_API_KEY` | secret | unset | Optional YouTube search |
-| `SCOUT_EXTRACT_MODEL` | variable | `claude-haiku-5-5` | Bulk page extraction |
-| `SCOUT_ANALYSIS_MODEL` | variable | `claude-opus-5-5` | Ranking, advice, startup analysis |
-| `SCOUT_MAX_LLM_USD_PER_MONTH` | variable | `12` | Stops Claude calls when reached |
+| `SCOUT_LLM_PROVIDER` | variable | `auto` | `gemini`, `anthropic`, or `auto` (Claude if its key is set, else Gemini) |
+| `SCOUT_EXTRACT_MODEL` | variable | `gemini-3.5-flash-lite` / `claude-haiku-5-5` | Bulk page extraction |
+| `SCOUT_ANALYSIS_MODEL` | variable | `gemini-3.6-flash` / `claude-opus-5-5` | Ranking, advice, startup analysis |
+| `SCOUT_LLM_RPM` | variable | `10` (Gemini) / unlimited (Claude) | Maximum AI requests per minute |
+| `SCOUT_MAX_LLM_USD_PER_MONTH` | variable | `12` | Stops Claude calls when reached (Gemini free tier is counted as $0) |
 | `SCOUT_MAX_TAVILY_PER_DAY` | variable | `30` | Stops searches when reached |
 
 ---
@@ -108,11 +143,11 @@ Optional: add `YOUTUBE_API_KEY` (YouTube Data API v3, free quota) for video resu
 | GitHub Actions (public repo) | Free |
 | Tavily (~24 credits/day ≈ 720/month) | Free tier |
 | Telegram Bot API, RSS feeds | Free |
-| Claude Haiku 5.5 extraction (~60 pages/day) | ≈ $0.04/day |
-| Claude Opus 5.5 analysis (3 calls/day) | ≈ $0.20–0.30/day |
-| **Total** | **≈ US$5–10 per month** (hard cap: `SCOUT_MAX_LLM_USD_PER_MONTH`, default $12) |
+| Gemini free tier (default: ~60 extraction + 3 analysis calls/day) | Free |
+| **Total with Gemini** | **US$0** |
+| Optional instead: Claude Haiku 5.5 extraction + Opus 5.5 analysis | ≈ US$5–10 per month (hard cap: `SCOUT_MAX_LLM_USD_PER_MONTH`, default $12) |
 
-`/status` shows Tavily credits and estimated Claude spend for the month. Costs fall over time because URLs already processed are never re-extracted.
+`/status` shows Tavily credits and AI calls (and estimated Claude spend) for the month. Costs fall over time because URLs already processed are never re-extracted.
 
 ## Data and privacy
 
@@ -130,7 +165,7 @@ Optional: add `YOUTUBE_API_KEY` (YouTube Data API v3, free quota) for video resu
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 python -m pytest                        # offline tests (no API keys needed)
-export ANTHROPIC_API_KEY=... TAVILY_API_KEY=...
+export GEMINI_API_KEY=... TAVILY_API_KEY=...   # or ANTHROPIC_API_KEY=...
 python -m scout scout internships       # run one agent, print new items
 python -m scout daily --dry-run         # full run, print the digest instead of sending
 python -m scout report internships      # print what /internships would reply
@@ -139,5 +174,7 @@ python -m scout report internships      # print what /internships would reply
 ## Troubleshooting
 
 - **No digest arrived.** Check **Actions → Daily digest** for today's runs and read the job summary. Missing secrets are listed in the job summary, and a scheduled run fails straight away if the Telegram ones are absent. If the schedule shows as disabled, click **Enable workflow**.
+- **"Gemini daily free quota … is used up" in the summary.** Normal on busy days; the rest is checked tomorrow. To spread the load, lower `SCOUT_MAX_CANDIDATES` (default 25 pages per agent) or check your limits in Google AI Studio.
+- **"API key not valid" or "free tier is not available in your country".** Recreate the key in AI Studio and update the `GEMINI_API_KEY` secret.
 - **The bot doesn't answer commands.** Check that `TELEGRAM_CHAT_ID` matches the ID from `whoami`, and look at the latest **Telegram commands** run.
 - **Too many or too few items.** Adjust the queries and weights in `config/*.yaml`, or `min_relevance` in the agent classes.

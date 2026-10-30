@@ -133,7 +133,7 @@ def test_poll_answers_only_allowed_chat_and_acks(db, tg):
 def test_daily_without_telegram_fails_before_scouting(tmp_path, monkeypatch, freeze):
     from scout import cli
 
-    for name in ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+    for name in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "TAVILY_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SCOUT_DB", str(tmp_path / "scout.db"))
     summary = tmp_path / "summary.md"
