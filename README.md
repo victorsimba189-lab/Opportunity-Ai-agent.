@@ -138,6 +138,6 @@ python -m scout report internships      # print what /internships would reply
 
 ## Troubleshooting
 
-- **No digest arrived.** Check **Actions → Daily digest** for today's runs and read the job summary. Missing secrets are logged as warnings. If the schedule shows as disabled, click **Enable workflow**.
+- **No digest arrived.** Check **Actions → Daily digest** for today's runs and read the job summary. Missing secrets are listed in the job summary, and a scheduled run fails straight away if the Telegram ones are absent. If the schedule shows as disabled, click **Enable workflow**.
 - **The bot doesn't answer commands.** Check that `TELEGRAM_CHAT_ID` matches the ID from `whoami`, and look at the latest **Telegram commands** run.
 - **Too many or too few items.** Adjust the queries and weights in `config/*.yaml`, or `min_relevance` in the agent classes.
