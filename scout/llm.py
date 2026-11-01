@@ -1,4 +1,7 @@
-"""Claude API wrapper: structured extraction (cheap model) and analysis (strong model) with cost tracking."""
+"""LLM wrapper: structured extraction (cheap model) and analysis (strong model) with cost tracking.
+
+LLM talks to Claude; scout.gemini.GeminiLLM offers the same interface on the Gemini API free tier.
+"""
 
 from __future__ import annotations
 
@@ -31,7 +34,7 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 
 class LLMBudgetExceeded(RuntimeError):
-    pass
+    """No more LLM calls this run: monthly budget reached, daily quota used up, or the API rejects the setup."""
 
 
 def estimate_cost(model: str, usage) -> float:
@@ -43,15 +46,18 @@ def estimate_cost(model: str, usage) -> float:
 
 
 class LLM:
-    def __init__(self, settings: Settings, db: DB, client: anthropic.Anthropic | None = None):
+    provider = "Claude"
+
+    def __init__(self, settings: Settings, db: DB, client=None):
         self.settings = settings
         self.db = db
-        self.client = client or anthropic.Anthropic(
-            api_key=settings.anthropic_api_key, max_retries=4, timeout=300.0
-        )
+        self.client = client or self._make_client()
         self._lock = threading.Lock()
         self.calls = 0
         self.cost = 0.0
+
+    def _make_client(self):
+        return anthropic.Anthropic(api_key=self.settings.anthropic_api_key, max_retries=4, timeout=300.0)
 
     def month_spend(self) -> float:
         return self.db.usage("llm_usd", timeutil.today_ist().strftime("%Y-%m"))
@@ -63,7 +69,9 @@ class LLM:
             )
 
     def _record(self, model: str, response) -> None:
-        cost = estimate_cost(model, response.usage)
+        self._add_usage(estimate_cost(model, response.usage))
+
+    def _add_usage(self, cost: float) -> None:
         with self._lock:
             self.calls += 1
             self.cost += cost
@@ -122,3 +130,14 @@ class LLM:
             **kwargs,
         )
         return self._result(model, response, schema)
+
+
+def make_llm(settings: Settings, db: DB) -> LLM | None:
+    """The configured provider's client, or None when its API key is missing."""
+    if not getattr(settings, settings.llm_key_field):
+        return None
+    if settings.llm_provider == "gemini":
+        from .gemini import GeminiLLM
+
+        return GeminiLLM(settings, db)
+    return LLM(settings, db)

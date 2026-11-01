@@ -354,7 +354,7 @@ def status_report(db: DB) -> str:
         lines.append(f"Last digest: {sent}")
     month = timeutil.today_ist().strftime("%Y-%m")
     lines.append(f"Usage this month: Tavily {db.usage('tavily', month):.0f} credits · "
-                 f"Claude ≈ ${db.usage('llm_usd', month):.2f}")
+                 f"AI {db.usage('llm_calls', month):.0f} calls ≈ ${db.usage('llm_usd', month):.2f}")
     lines.append("Next digest: 10:00 IST tomorrow" if timeutil.seconds_until_ist(10) < 0 else "Next digest: 10:00 IST today")
     return "\n".join(lines)
 

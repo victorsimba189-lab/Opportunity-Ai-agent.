@@ -1,4 +1,4 @@
-"""Structured-output schemas for Claude. Every critical fact carries a verbatim quote for verification."""
+"""Structured-output schemas for the LLM. Every critical fact carries a verbatim quote for verification."""
 
 from __future__ import annotations
 
