@@ -4,7 +4,7 @@ import pytest
 
 from scout.bot import parse_command, poll
 from scout.delivery import deliver_daily
-from scout.report import CHUNK_LIMIT, build_digest, command_report, esc, pack
+from scout.report import CHUNK_LIMIT, HELP, build_digest, build_replies, command_report, esc, pack
 from scout.telegram import TelegramError
 
 from .conftest import FakeTelegram
@@ -142,3 +142,33 @@ def test_daily_without_telegram_fails_before_scouting(tmp_path, monkeypatch, fre
 
     assert cli.main(["daily", "--wait"]) == 1
     assert "TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID" in summary.read_text()
+
+
+def test_poll_steps_aside_when_the_worker_webhook_is_set(db, tg):
+    tg.webhook = "https://scout.example.workers.dev/telegram"
+    tg.updates = [{"update_id": 10, "message": {"chat": {"id": 42}, "text": "/internships"}}]
+    assert poll(db, tg, "42") == {"updates": 0, "webhook": True}
+    assert tg.sent == [] and tg.acked is None
+
+
+def test_replies_for_the_worker(db):
+    add_item(db)
+    data = build_replies(db)
+    json.dumps(data)  # saved as replies.json
+    replies = data["replies"]
+    assert set(replies) == {"internships", "courses", "startups", "deadlines", "sources", "status", "help"}
+    assert data["aliases"] == {"start": "help", "programmes": "courses"}
+    assert "PEB internship" in replies["internships"][0]
+    assert replies["help"] == [HELP]
+    for command in ("internships", "status"):
+        assert replies[command][-1].endswith("<i>From the scan saved 29 Oct, 09:15 IST.</i>")
+    assert all(len(c) <= CHUNK_LIMIT for chunks in replies.values() for c in chunks)
+
+
+def test_replies_command_writes_next_to_the_database(tmp_path, monkeypatch, freeze):
+    from scout import cli
+
+    monkeypatch.setenv("SCOUT_DB", str(tmp_path / "scout.db"))
+    assert cli.main(["replies"]) == 0
+    data = json.loads((tmp_path / "replies.json").read_text(encoding="utf-8"))
+    assert "No known deadlines" in data["replies"]["deadlines"][0]

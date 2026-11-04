@@ -71,6 +71,11 @@ class Telegram:
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         self.call("setMyCommands", commands=[{"command": c, "description": d} for c, d in commands])
 
+    def webhook_url(self) -> str:
+        """The webhook URL Telegram pushes updates to ("" when commands are fetched by polling)."""
+        info = self.call("getWebhookInfo") or {}
+        return str(info.get("url") or "")
+
     def delete_webhook(self) -> None:
         self.call("deleteWebhook", drop_pending_updates=False)
 

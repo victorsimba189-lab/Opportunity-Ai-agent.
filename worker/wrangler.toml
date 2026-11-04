@@ -1,0 +1,14 @@
+# Deploy from this folder with:  npx wrangler deploy
+# Secrets (once each):           npx wrangler secret put TELEGRAM_BOT_TOKEN   (and TELEGRAM_CHAT_ID,
+#                                GITHUB_TOKEN, WEBHOOK_SECRET)
+# Or skip the CLI: paste index.js into the Cloudflare dashboard editor (README, step 9).
+name = "opportunity-scout"
+main = "index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+GITHUB_REPO = "victorsimba189-lab/Opportunity-Ai-agent."
+
+[triggers]
+# UTC. 03:45 = 09:15 IST (scout, then send at 10:00 IST); 05:15 = 10:45 IST (fallback, sends only if missing).
+crons = ["45 3 * * *", "15 5 * * *"]

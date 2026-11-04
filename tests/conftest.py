@@ -33,6 +33,7 @@ class FakeTelegram:
         self.updates: list[dict] = []
         self.acked: int | None = None
         self.commands = None
+        self.webhook = ""
 
     def send_message(self, chat_id, text, html=True):
         from scout.telegram import TelegramError
@@ -52,6 +53,9 @@ class FakeTelegram:
 
     def set_commands(self, commands):
         self.commands = commands
+
+    def webhook_url(self):
+        return self.webhook
 
 
 @pytest.fixture

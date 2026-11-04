@@ -1,6 +1,6 @@
 # Opportunity & Startup Intelligence Scout
 
-Three AI scouting agents that search the web every morning, verify what they find against the original sources, and send **one Telegram digest at 10:00 IST**. Everything runs on GitHub Actions, so it keeps working when your computer is off.
+Three AI scouting agents that search the web every morning, verify what they find against the original sources, and send **one Telegram digest at 10:00 IST**. Everything runs on GitHub Actions (plus an optional free Cloudflare Worker for on-time delivery and instant bot replies), so it keeps working when your computer is off.
 
 | Agent | Looks for |
 |---|---|
@@ -17,10 +17,16 @@ Bot commands: `/internships` `/courses` `/startups` `/deadlines` `/sources` `/st
 ## How it works
 
 ```
-GitHub Actions (cron, UTC)
- ├─ daily.yml   09:13 IST  restore DB → 3 agents → wait until 10:00 IST → send digest → save DB
- │              10:43 IST  fallback: sends only if today's digest is missing
- └─ bot.yml     every 15 min: read DB → answer Telegram commands
+Cloudflare Worker (free, step 9; recommended)
+ ├─ cron 09:15 IST  → starts daily.yml on time      10:45 IST fallback start
+ └─ Telegram webhook → answers commands in seconds from replies.json
+
+GitHub Actions
+ ├─ daily.yml   restore DB → 3 agents → wait until 10:00 IST → send digest
+ │              → save DB + replies.json (rendered command replies)
+ │              Also on GitHub's own schedule (09:13 / 10:43 IST), which often starts hours late;
+ │              any run after the digest went out exits at once.
+ └─ bot.yml     every 15 min: read DB → answer Telegram commands (only used without the Worker)
 
 Each agent:  Tavily search + official pages (watchlist) + RSS
              → skip URLs already processed → fetch page (robots.txt, rate-limited; HTML and PDF)
@@ -32,10 +38,10 @@ Each agent:  Tavily search + official pages (watchlist) + RSS
                outside your dates, paid) → dedupe (URL, fingerprint, fuzzy) → score
              → a stronger model (Gemini 3.6 Flash, or Claude Opus 5.5) ranks the new items and writes "why it matters" and
                "next action", plus the growth story, edge and lessons for startup stories
-SQLite (data/scout.db) is kept on the bot-managed `scout-data` branch between runs.
+SQLite (data/scout.db) and replies.json are kept on the bot-managed `scout-data` branch.
 ```
 
-Code map: `scout/agents/` (the three agents and the shared pipeline), `scout/sources/` (Tavily, RSS, fetching, YouTube), `scout/verify.py`, `scout/dedupe.py`, `scout/rank.py`, `scout/llm.py` (Claude), `scout/gemini.py` (Gemini), `scout/report.py`, `scout/delivery.py`, `scout/bot.py`, `scout/db.py`. Search queries, official pages, feeds, score weights and manual-check links are in `config/*.yaml`. Your profile is in `config/profile.yaml`.
+Code map: `scout/agents/` (the three agents and the shared pipeline), `scout/sources/` (Tavily, RSS, fetching, YouTube), `scout/verify.py`, `scout/dedupe.py`, `scout/rank.py`, `scout/llm.py` (Claude), `scout/gemini.py` (Gemini), `scout/report.py`, `scout/delivery.py`, `scout/bot.py`, `scout/db.py`, and `worker/index.js` (the Cloudflare Worker). Search queries, official pages, feeds, score weights and manual-check links are in `config/*.yaml`. Your profile is in `config/profile.yaml`.
 
 ---
 
@@ -71,7 +77,28 @@ Run **Telegram commands** again, this time with mode `send-test`. You should get
 Click **Actions** → **Daily digest** → **Run workflow**. Leave `dry_run` ticked and click **Run workflow**. It takes about 10–20 minutes. Then open the run and click **Summary** to see what the digest would look like.
 
 **Step 8. Go live.**
-Run **Daily digest** once more with `dry_run` **unticked**. You get today's digest in Telegram. From now on it arrives by itself every day around 10:00 IST.
+Run **Daily digest** once more with `dry_run` **unticked**. You get today's digest in Telegram. From now on it arrives by itself every day. GitHub often starts scheduled jobs hours late, though, so do step 9 to get it at 10:00 IST and to get instant replies to bot commands.
+
+**Step 9 (recommended, about 10 minutes). On-time digest and instant replies with a free Cloudflare Worker.**
+In this repository GitHub has been starting the 09:13 IST job 6–8 hours late, and running the 15-minute command check only every few hours. A small Cloudflare Worker (free, no card) starts the daily job on time and answers commands within seconds.
+
+1. *Make a GitHub token for the Worker.* On GitHub click your profile picture → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**. Name it `scout-worker` and pick the longest expiry offered. Under **Repository access** choose **Only select repositories** and pick this repository. Under **Permissions** set **Actions** to *Read and write* and **Contents** to *Read-only*. Click **Generate token** and copy it (it starts with `github_pat_`).
+2. *Create the Worker.* Sign up at <https://dash.cloudflare.com>. Open **Workers & Pages** → **Create** → start from the **Hello World** Worker, name it `opportunity-scout` and click **Deploy**. Then click **Edit code**, delete everything in the editor, paste the whole of [`worker/index.js`](worker/index.js) and click **Deploy**.
+3. *Add the settings.* In the Worker open **Settings** → **Variables and Secrets** and add these (type **Secret**, except `GITHUB_REPO`, which is **Text**):
+
+   | Name | Value |
+   |---|---|
+   | `TELEGRAM_BOT_TOKEN` | the same bot token as in GitHub |
+   | `TELEGRAM_CHAT_ID` | the same chat ID as in GitHub |
+   | `GITHUB_TOKEN` | the token from part 1 |
+   | `GITHUB_REPO` | this repository's `owner/name`, e.g. `victorsimba189-lab/Opportunity-Ai-agent.` |
+   | `WEBHOOK_SECRET` | a made-up password of 20–40 letters and digits (no spaces) |
+
+4. *Add the timer.* In **Settings** → **Triggers** (sometimes called **Trigger Events**) → **Cron Triggers**, add `45 3 * * *` and `15 5 * * *`. Cloudflare uses UTC, so these are 09:15 and 10:45 IST.
+5. *Connect the bot.* Open `https://opportunity-scout.<your-subdomain>.workers.dev/setup?secret=<your WEBHOOK_SECRET>` in a browser (the Worker's address is shown at the top of its page). Every line should start with ✅, and your bot sends "Worker connected". Before the first daily run has finished, the "scan results" line shows ❌. That is expected.
+6. *Try it.* Send `/status` to your bot. The reply arrives within a few seconds.
+
+To go back to the GitHub-only setup, open the same `/setup` link with `&undo=1` added to the end. If you prefer the command line: `cd worker && npx wrangler deploy`, then `npx wrangler secret put <NAME>` for each secret (the cron triggers come from `worker/wrangler.toml`).
 
 Optional: add `YOUTUBE_API_KEY` (YouTube Data API v3, free quota) for video results. You can also set **repository variables** (Settings → Secrets and variables → Actions → **Variables** tab) to override the defaults below.
 
@@ -103,16 +130,21 @@ To switch to Claude (paid, about US$5–10 a month): create a key at <https://pl
 | `SCOUT_MAX_LLM_USD_PER_MONTH` | variable | `12` | Stops Claude calls when reached (Gemini free tier is counted as $0) |
 | `SCOUT_MAX_TAVILY_PER_DAY` | variable | `30` | Stops searches when reached |
 
+The Cloudflare Worker has its own settings (step 9): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GITHUB_TOKEN`, `GITHUB_REPO` and `WEBHOOK_SECRET`, plus optional `GITHUB_BRANCH` (default `main`) and `DATA_BRANCH` (default `scout-data`).
+
 ---
 
 ## Schedule and timing
 
 - GitHub cron runs in UTC, and IST is UTC+5:30 with no daylight saving, so 10:00 IST = 04:30 UTC.
-- GitHub can start scheduled jobs late (often 5–30 minutes) and occasionally drops one. To cover this, scouting starts at **09:13 IST** and the job **waits until 10:00 IST** before sending. A **10:43 IST fallback** run sends the digest only if today's is missing.
-- **Expect delivery between 10:00 and ~10:15 IST.** For to-the-minute delivery, add a free external trigger: a [cron-job.org](https://cron-job.org) job at 09:15 IST that calls `POST https://api.github.com/repos/<owner>/<repo>/actions/workflows/daily.yml/dispatches` with body `{"ref":"main","inputs":{"dry_run":"false","wait":"true"}}`. It needs a fine-grained token with *Actions: read and write* on this repo.
+- GitHub can start scheduled jobs late and drops many of them. In this repository the 09:13 IST job has started 6–8 hours late, and the 15-minute command check has run only every few hours.
+- **With the Cloudflare Worker (step 9):** the Worker starts the job at **09:15 IST**, scouting takes 10–20 minutes, and the job **waits until 10:00 IST** before sending. If GitHub's API is briefly down, the Worker retries, and it tries again at **10:45 IST**. If it can't start the job at all (for example, an expired token), it tells you in Telegram. **Expect delivery at 10:00 IST.**
+- **Without the Worker:** GitHub's own schedule starts the job (09:13 IST, fallback 10:43 IST), so the digest arrives whenever GitHub gets round to it, often in the afternoon.
+- GitHub's schedule stays on as a backup alongside the Worker. A run that starts after the digest was sent exits within seconds.
 - **Duplicate prevention:** only one digest per IST date. Each part's Telegram message ID is recorded as it is sent, so a retry after a partial failure sends only the missing parts. Items are announced once, and deadline reminders fire once per threshold (14/7/3/1 days).
-- Public repos have their schedules disabled after 60 days without activity. The daily job re-enables both workflows on every scheduled run to prevent this.
-- Commands are answered by polling every 15 minutes, so replies can take a few minutes. Updates are acknowledged only after the reply is sent. The bot ignores every chat except `TELEGRAM_CHAT_ID`.
+- Public repos have their schedules disabled after 60 days without activity. The daily job re-enables both workflows on every scheduled run, and the Worker re-enables the daily workflow before starting it.
+- **Commands with the Worker:** Telegram passes each command to the Worker, which replies within seconds using `replies.json`. Every daily run renders that file, so replies show the latest scan and end with the time it was saved. The Worker only accepts requests that carry `WEBHOOK_SECRET`, and it ignores every chat except `TELEGRAM_CHAT_ID`. While the Worker is connected, the GitHub poller sees the webhook and does nothing.
+- **Commands without the Worker:** they are answered by polling, scheduled every 15 minutes but in practice whenever GitHub runs it. Updates are acknowledged only after the reply is sent. The bot ignores every chat except `TELEGRAM_CHAT_ID`.
 
 ## Verification rules ("never invent information")
 
@@ -143,6 +175,7 @@ To switch to Claude (paid, about US$5–10 a month): create a key at <https://pl
 | GitHub Actions (public repo) | Free |
 | Tavily (~24 credits/day ≈ 720/month) | Free tier |
 | Telegram Bot API, RSS feeds | Free |
+| Cloudflare Worker (2 cron runs + a few commands a day; free plan allows 100,000 requests a day) | Free |
 | Gemini free tier (default: ~60 extraction + 3 analysis calls/day) | Free |
 | **Total with Gemini** | **US$0** |
 | Optional instead: Claude Haiku 5.5 extraction + Opus 5.5 analysis | ≈ US$5–10 per month (hard cap: `SCOUT_MAX_LLM_USD_PER_MONTH`, default $12) |
@@ -151,7 +184,8 @@ To switch to Claude (paid, about US$5–10 a month): create a key at <https://pl
 
 ## Data and privacy
 
-- The SQLite DB lives on the `scout-data` branch (one commit, overwritten each run). A 30-day backup is attached to each daily run as an artifact.
+- The SQLite DB and `replies.json` (the rendered command replies) live on the `scout-data` branch (one commit, overwritten each run). A 30-day backup of the DB is attached to each daily run as an artifact.
+- The Worker's GitHub token can only start workflows in, and read, this one repository. Its secrets stay in Cloudflare and are never sent anywhere except Telegram and GitHub.
 - This repo is **public**, so the DB, workflow logs and `config/profile.yaml` are publicly readable. They contain only public listings and the digest text. Secrets and your chat ID are never stored or logged. Make the repo private if you prefer; that gives 2,000 free Actions minutes/month, which is enough if the poller runs every 30 minutes instead of 15.
 
 ## Customising
@@ -169,6 +203,8 @@ export GEMINI_API_KEY=... TAVILY_API_KEY=...   # or ANTHROPIC_API_KEY=...
 python -m scout scout internships       # run one agent, print new items
 python -m scout daily --dry-run         # full run, print the digest instead of sending
 python -m scout report internships      # print what /internships would reply
+python -m scout replies                 # write data/replies.json (what the Worker serves)
+cd worker && node --test                # Worker tests (Node 18+, no dependencies)
 ```
 
 ## Troubleshooting
@@ -176,5 +212,7 @@ python -m scout report internships      # print what /internships would reply
 - **No digest arrived.** Check **Actions → Daily digest** for today's runs and read the job summary. Missing secrets are listed in the job summary, and a scheduled run fails straight away if the Telegram ones are absent. If the schedule shows as disabled, click **Enable workflow**.
 - **"Gemini daily free quota … is used up" in the summary.** Normal on busy days; the rest is checked tomorrow. To spread the load, lower `SCOUT_MAX_CANDIDATES` (default 25 pages per agent) or check your limits in Google AI Studio.
 - **"API key not valid" or "free tier is not available in your country".** Recreate the key in AI Studio and update the `GEMINI_API_KEY` secret.
-- **The bot doesn't answer commands.** Check that `TELEGRAM_CHAT_ID` matches the ID from `whoami`, and look at the latest **Telegram commands** run.
+- **The bot doesn't answer commands.** Check that `TELEGRAM_CHAT_ID` matches the ID from `whoami`. With the Worker, open its `/setup?secret=…` link again: each ❌ line says what to fix, and the Worker's **Logs** tab in Cloudflare shows errors. Without the Worker, look at the latest **Telegram commands** run.
+- **"could not start today's digest run" in Telegram.** The Worker's GitHub token was rejected, usually because it expired. Make a new one (step 9, part 1) and replace the `GITHUB_TOKEN` secret in the Worker.
+- **`whoami` fails with "webhook is active".** While the Worker is connected, GitHub can't read the bot's messages. Remove `TELEGRAM_CHAT_ID` from the Worker and message the bot: it replies with your chat ID. Then add the ID back.
 - **Too many or too few items.** Adjust the queries and weights in `config/*.yaml`, or `min_relevance` in the agent classes.
