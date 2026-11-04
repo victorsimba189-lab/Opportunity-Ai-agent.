@@ -41,7 +41,7 @@ Each agent:  Tavily search + official pages (watchlist) + RSS
 SQLite (data/scout.db) and replies.json are kept on the bot-managed `scout-data` branch.
 ```
 
-Code map: `scout/agents/` (the three agents and the shared pipeline), `scout/sources/` (Tavily, RSS, fetching, YouTube), `scout/verify.py`, `scout/dedupe.py`, `scout/rank.py`, `scout/llm.py` (Claude), `scout/gemini.py` (Gemini), `scout/report.py`, `scout/delivery.py`, `scout/bot.py`, `scout/db.py`, and `worker/index.js` (the Cloudflare Worker). Search queries, official pages, feeds, score weights and manual-check links are in `config/*.yaml`. Your profile is in `config/profile.yaml`.
+Code map: `scout/agents/` (the three agents and the shared pipeline), `scout/sources/` (Tavily, RSS, fetching, YouTube), `scout/verify.py`, `scout/dedupe.py`, `scout/rank.py`, `scout/llm.py` (Claude), `scout/gemini.py` (Gemini), `scout/report.py`, `scout/delivery.py`, `scout/bot.py`, `scout/check.py` (setup check), `scout/db.py`, and `worker/index.js` (the Cloudflare Worker). Search queries, official pages, feeds, score weights and manual-check links are in `config/*.yaml`. Your profile is in `config/profile.yaml`.
 
 ---
 
@@ -70,8 +70,8 @@ Open this repository on GitHub. Click **Settings** → **Secrets and variables**
 **Step 5. Find your chat ID.**
 Click the **Actions** tab → **Telegram commands** (left side) → **Run workflow**. Choose mode `whoami` and click the green **Run workflow** button. After a minute your bot sends you a message with your **chat ID** (a number). Add it as one more secret named `TELEGRAM_CHAT_ID`, the same way as step 4.
 
-**Step 6. Send a test message.**
-Run **Telegram commands** again, this time with mode `send-test`. You should get a "test message" in Telegram. If not, check the token and chat ID secrets.
+**Step 6. Check every key.**
+Run **Telegram commands** again, this time with mode `check`. After a minute or two your bot sends a checklist: one line for the bot, your chat, each AI model, Tavily and (if you added it) YouTube. Each line starts with ✅, or with ❌ and what to fix. If no message arrives, open the run and click **Summary**: the same checklist is there. Fix any ❌ lines and run the check again. It spends no Tavily credits and one tiny AI request per model, so you can run it as often as you like.
 
 **Step 7. Do a practice run (nothing is sent).**
 Click **Actions** → **Daily digest** → **Run workflow**. Leave `dry_run` ticked and click **Run workflow**. It takes about 10–20 minutes. Then open the run and click **Summary** to see what the digest would look like.
@@ -204,11 +204,13 @@ python -m scout scout internships       # run one agent, print new items
 python -m scout daily --dry-run         # full run, print the digest instead of sending
 python -m scout report internships      # print what /internships would reply
 python -m scout replies                 # write data/replies.json (what the Worker serves)
+python -m scout check                   # test every key and setting (setup step 6)
 cd worker && node --test                # Worker tests (Node 18+, no dependencies)
 ```
 
 ## Troubleshooting
 
+- **Not sure a key is right.** Run **Actions → Telegram commands** with mode `check` (step 6). It tests every key in a minute or two and says what to fix.
 - **No digest arrived.** Check **Actions → Daily digest** for today's runs and read the job summary. Missing secrets are listed in the job summary, and a scheduled run fails straight away if the Telegram ones are absent. If the schedule shows as disabled, click **Enable workflow**.
 - **"Gemini daily free quota … is used up" in the summary.** Normal on busy days; the rest is checked tomorrow. To spread the load, lower `SCOUT_MAX_CANDIDATES` (default 25 pages per agent) or check your limits in Google AI Studio.
 - **"API key not valid" or "free tier is not available in your country".** Recreate the key in AI Studio and update the `GEMINI_API_KEY` secret.

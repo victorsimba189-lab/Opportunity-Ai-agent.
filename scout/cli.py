@@ -15,11 +15,12 @@ from . import AGENTS, timeutil
 from .agents import SCOUTS, Context
 from .agents.base import AgentResult
 from .bot import COMMANDS, poll, whoami
+from .check import run_checks, verdict
 from .config import Settings, profile
 from .db import DB
 from .delivery import deliver_daily
 from .llm import make_llm
-from .report import build_replies, command_report
+from .report import build_replies, command_report, esc
 from .sources.fetch import Fetcher, make_client
 from .sources.tavily import Tavily
 from .telegram import Telegram
@@ -192,6 +193,24 @@ def cmd_send_test(args, settings: Settings, db: DB) -> int:
     return 0
 
 
+def cmd_check(args, settings: Settings, db: DB) -> int:
+    checks, tg = run_checks(settings, make_client())
+    result = verdict(checks)
+    log.info("%s", result)
+    summary("## Setup check\n\n" + "\n".join(f"- {c.line()}" for c in checks) + f"\n\n**{result}**")
+    if tg is not None:
+        now = timeutil.now_ist().strftime("%d %b, %H:%M IST")
+        message = (f"🔎 <b>Opportunity Scout setup check</b> ({now})\n\n"
+                   + "\n".join(esc(c.line()) for c in checks) + f"\n\n<b>{esc(result)}</b>")
+        try:
+            tg.send_message(settings.telegram_chat_id, message)
+            tg.set_commands(COMMANDS)
+        except Exception as exc:
+            log.error("could not send the result to Telegram: %s", exc)
+            return 1
+    return 1 if any(c.status == "fail" for c in checks) else 0
+
+
 def cmd_replies(args, settings: Settings, db: DB) -> int:
     out = Path(args.out) if args.out else settings.db_path.parent / "replies.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -222,6 +241,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("poll", help="answer pending Telegram commands")
     sub.add_parser("whoami", help="reply to people who messaged the bot with their chat id")
     sub.add_parser("send-test", help="send a Telegram test message")
+    sub.add_parser("check", help="test every key and setting, and say what to fix")
     p = sub.add_parser("replies", help="save rendered command replies for the Cloudflare Worker")
     p.add_argument("--out", help="output file (default: replies.json next to the database)")
     p = sub.add_parser("report", help="print a command report")
@@ -233,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         handler = {
             "daily": cmd_daily, "scout": cmd_scout, "poll": cmd_poll, "whoami": cmd_whoami,
-            "send-test": cmd_send_test, "replies": cmd_replies, "report": cmd_report,
+            "send-test": cmd_send_test, "check": cmd_check, "replies": cmd_replies, "report": cmd_report,
         }[args.cmd]
         return handler(args, settings, db)
     finally:

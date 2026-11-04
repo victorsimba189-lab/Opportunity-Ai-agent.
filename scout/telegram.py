@@ -16,6 +16,10 @@ class TelegramError(RuntimeError):
     pass
 
 
+class TelegramNetworkError(TelegramError):
+    """Telegram could not be reached at all (as opposed to Telegram rejecting the request)."""
+
+
 class Telegram:
     def __init__(self, token: str, client: httpx.Client | None = None):
         self._base = f"https://api.telegram.org/bot{token}/"
@@ -28,7 +32,7 @@ class Telegram:
                 resp = self.client.post(self._base + method, json=params)
             except httpx.TransportError as exc:
                 if attempt == attempts:
-                    raise TelegramError(f"{method}: network error {type(exc).__name__}") from None
+                    raise TelegramNetworkError(f"{method}: network error {type(exc).__name__}") from None
                 time.sleep(delay)
                 delay *= 2
                 continue
