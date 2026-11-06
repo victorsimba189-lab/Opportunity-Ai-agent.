@@ -84,6 +84,11 @@ jobs:
           echo "Running: python -m scout daily ${args[*]}"
           python -m scout daily "${args[@]}"
 
+      - name: Save command replies for the Cloudflare Worker
+        if: always()
+        continue-on-error: true
+        run: python -m scout replies
+
       - name: Save database
         if: always()
         run: scripts/db_sync.sh push

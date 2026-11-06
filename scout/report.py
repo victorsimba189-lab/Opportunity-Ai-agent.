@@ -33,8 +33,11 @@ HELP = (
     "/sources — links to check manually (LinkedIn, Instagram…)\n"
     "/status — last run, usage and next digest\n"
     "/help — this message\n\n"
-    "Replies come from the latest scan and can take up to ~15 minutes."
+    "Replies use the latest daily scan."
 )
+# Commands the Cloudflare Worker answers from replies.json, and the names that map onto them.
+REPLY_COMMANDS = ("internships", "courses", "startups", "deadlines", "sources", "status")
+REPLY_ALIASES = {"start": "help", "programmes": "courses"}
 
 
 def esc(value) -> str:
@@ -369,3 +372,21 @@ def sources_report(db: DB) -> str:
         lines.append("\n<b>Sources failing on the last scan</b>")
         lines += [f"• {esc(r['url'])} — {esc(r['last_status'][:60])}" for r in broken[:10]]
     return "\n".join(lines)
+
+
+def build_replies(db: DB) -> dict:
+    """Pre-rendered command replies, saved next to the DB so the Cloudflare Worker can answer instantly.
+
+    Each reply ends with the time it was rendered, because the Worker serves it until the next run.
+    """
+    footer = f"<i>From the scan saved {timeutil.now_ist().strftime('%d %b, %H:%M IST')}.</i>"
+    replies = {}
+    for command in REPLY_COMMANDS:
+        chunks = command_report(db, command)
+        if len(chunks[-1]) + len(footer) + 2 <= CHUNK_LIMIT:
+            chunks[-1] += "\n\n" + footer
+        else:
+            chunks.append(footer)
+        replies[command] = chunks
+    replies["help"] = [HELP]
+    return {"version": 1, "generated_at": timeutil.iso_now(), "aliases": REPLY_ALIASES, "replies": replies}

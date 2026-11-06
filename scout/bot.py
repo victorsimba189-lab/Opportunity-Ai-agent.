@@ -36,6 +36,11 @@ def poll(db: DB, tg: Telegram, allowed_chat_id: str) -> dict:
     mid-way re-delivers them next run instead of losing them. The offset lives on Telegram's
     side, so this job never needs to write the database.
     """
+    if tg.webhook_url():
+        # The Cloudflare Worker receives commands by webhook and answers them; while a webhook
+        # is set, Telegram refuses getUpdates (409 Conflict), so there is nothing to do here.
+        log.info("webhook is set: the Cloudflare Worker answers commands; nothing to poll")
+        return {"updates": 0, "webhook": True}
     updates = tg.get_updates()
     stats = {"updates": len(updates), "replied": 0, "ignored": 0}
     for update in updates:

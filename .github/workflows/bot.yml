@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "poll = answer commands, whoami = reply with chat id, send-test = test message"
+        description: "check = test every key, whoami = reply with chat id, send-test = test message, poll = answer commands"
         type: choice
-        options: [poll, whoami, send-test]
-        default: poll
+        options: [check, whoami, send-test, poll]
+        default: check
 
 permissions:
   contents: read   # reads the database; never writes it
@@ -41,4 +41,12 @@ jobs:
       - name: Run
         env:
           MODE: ${{ inputs.mode || 'poll' }}
+          # Only the setup check needs the AI and search keys; the 15-minute poller never gets them.
+          GEMINI_API_KEY: ${{ inputs.mode == 'check' && secrets.GEMINI_API_KEY || '' }}
+          ANTHROPIC_API_KEY: ${{ inputs.mode == 'check' && secrets.ANTHROPIC_API_KEY || '' }}
+          TAVILY_API_KEY: ${{ inputs.mode == 'check' && secrets.TAVILY_API_KEY || '' }}
+          YOUTUBE_API_KEY: ${{ inputs.mode == 'check' && secrets.YOUTUBE_API_KEY || '' }}
+          SCOUT_LLM_PROVIDER: ${{ vars.SCOUT_LLM_PROVIDER }}
+          SCOUT_EXTRACT_MODEL: ${{ vars.SCOUT_EXTRACT_MODEL }}
+          SCOUT_ANALYSIS_MODEL: ${{ vars.SCOUT_ANALYSIS_MODEL }}
         run: python -m scout "$MODE"
